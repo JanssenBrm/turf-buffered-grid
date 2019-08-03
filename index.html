@@ -34,63 +34,65 @@
      * @param buffer - Buffer between cells in geographical meters
      * @returns {Array}
      */
-    function rectangleBufferedGrid(point, line, rows, cols, buffer = 0) {
-        var result = [];
+    function bufferedGrid(line, heightPoint, rows, cols, buffer) {
+        const result = [];
 
-        var startLine = turf.point(line.geometry.coordinates[0]);
-        var endLine = turf.point(line.geometry.coordinates[line.geometry.coordinates.length - 1]);
+        buffer = buffer || 0;
 
-        // Get the distance between the point and the line to calculate the height of the box
-        var height = turf.pointToLineDistance(point, line, {units: 'degrees'});
+
+        const startLine = turf.point(line.geometry.coordinates[0]);
+        const endLine = turf.point(line.geometry.coordinates[line.geometry.coordinates.length - 1]);
+
+        // Get the distance between the heightPoint and the line to calculate the height of the box
+        const height = turf.pointToLineDistance(heightPoint, line, {units: 'degrees'});
 
         // Calculate line length
-        var length = turf.length(line, {units: 'degrees'});
-
-        // Get the bearings (degrees of the lines) of the line between the start point and point that is used for the heigh
-        var bearingToPoint = turf.bearing(startLine, point);
+        const lineLength = turf.length(line, {units: 'degrees'});
 
         // Get the bearings (degrees of the lines) of the starting line
-        var bearingLine = turf.bearing(startLine, endLine);
+        const bearingLine = turf.bearing(startLine, endLine);
 
-        // Check the the angle of the point based on the bearing of the line to determine to which direction to draw the grid
-        var angle = Math.abs(bearingToPoint) < bearingLine ? -90 : 90;
+        // Get the angle difference between the line and the line between the start heightPoint and the pont selected for
+        // for the height
+        const bearingDiff = turf.bearing(startLine, heightPoint) - bearingLine;
+
+        // Check the the angle of the heightPoint based on the bearing of the line to determine to which direction to draw the
+        // grid
+        const angle = bearingDiff <= 0 && bearingDiff >= -180 ? -90 : 90;
 
         // Calculate the length of each grid cell based on the number of cells required on the base line
-        var diffX = length / rows;
+        const diffX = lineLength / rows;
 
-        // Calculate the height of each grid cell based on the number of cells required on the line perpendicular to the base line
-        var diffY = height / cols;
+        // Calculate the height of each grid cell based on the number of cells required on the line perpendicular to the
+        // base line
+        const diffY = height / cols;
 
 
-        // Translate the start point over the diffs to create a basic polygon
-       turf.transformTranslate(startLine, height, bearingLine + angle, {units: 'degrees'});
-        var translatedEnd = turf.transformTranslate(endLine, height, bearingLine + angle , {units: 'degrees'});
+        //Convert te buffer in meters to degrees
+        const bufferDegrees = turf.lengthToDegrees(buffer, 'meters');
 
-        var bufferDegrees = turf.lengthToDegrees(buffer, 'meters');
+        //Creation of the base polygon to repeat
+        const baseP1 = startLine;
+        const baseP2 = turf.transformTranslate(baseP1, diffY - bufferDegrees, bearingLine + angle, {units: 'degrees'});
+        const baseP3 = turf.transformTranslate(baseP2, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
+        const baseP4 = turf.transformTranslate(baseP1, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
 
-        var baseP1 = startLine;
-        var baseP2 = turf.transformTranslate(baseP1, diffY - bufferDegrees, bearingLine + angle, {units: 'degrees'});
-        var baseP3 = turf.transformTranslate(baseP2, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
-        var baseP4 = turf.transformTranslate(baseP1, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
+        const basePolygon = turf.polygon([[baseP1, baseP2, baseP3, baseP4, baseP1].map(point => point.geometry.coordinates)]);
 
-        var basePolygon = turf.polygon(
-            [[baseP1, baseP2, baseP3, baseP4, baseP1].map(point => point.geometry.coordinates)]
-        )
+        let rowPolygon = basePolygon;
+        let idxX = 0;
+        let idxY = 0;
 
-        var rowPolygon = basePolygon;
-        idxX = 0;
-        idxY = 0;
-
-        while(idxX < rows) {
+        while (idxX < rows) {
             idxY = 0;
             rowPolygon = turf.transformTranslate(basePolygon, idxX * diffX, bearingLine, {units: 'degrees'});
-            while(idxY < cols){
-               result.push( turf.transformTranslate(rowPolygon, idxY * diffY, bearingLine + angle, {units: 'degrees'}))
+            while (idxY < cols) {
+                result.push(turf.transformTranslate(rowPolygon, idxY * diffY, bearingLine + angle, {units: 'degrees'}));
                 idxY++;
             }
             idxX++;
         }
-        return result;
+        return turf.featureCollection(result);
     }
 
 
@@ -104,41 +106,62 @@
         zoom: 11 // starting zoom
     });
 
-    var line = {
-        "type": "Feature",
-        "properties": {},
-        "geometry": {
-            "type": "LineString",
-            "coordinates": [
-                [
-                    5.1470947265625,
-                    51.095760497969785
-                ],
-                [
-                    5.365447998046875,
-                    51.086272518565515
-                ]
-            ]
-        }
-    };
+    // var line = {
+    //     "type": "Feature",
+    //     "properties": {},
+    //     "geometry": {
+    //         "type": "LineString",
+    //         "coordinates": [
+    //             [
+    //                 5.1470947265625,
+    //                 51.195760497969785
+    //             ],
+    //             [
+    //                 5.365447998046875,
+    //                 51.006272518565515
+    //             ]
+    //         ]
+    //     }
+    // };
 
-    var point = {
-        "type": "Feature",
-        "properties": {},
-        "geometry": {
-            "type": "Point",
-            "coordinates": [
-                5.2679443359375,
-                51.144894309328016
-            ]
-        }
-    };
-
+   var config = {
+       "line": {
+           "type": "Feature",
+           "properties": {},
+           "geometry": {
+               "type": "LineString",
+               "coordinates": [
+                   [
+                       5.1470947265625,
+                       51.006272518565515
+                   ],
+                   [
+                       5.365447998046875,
+                       51.195760497969785
+                   ]
+               ]
+           }
+       },
+       "point": {
+           "type": "Feature",
+           "properties": {},
+           "geometry": {
+               "type": "Point",
+               "coordinates": [
+                   5.168986916542053,
+                   51.16964680028178
+               ]
+           }
+       },
+       "rows": 10,
+       "cols": 15,
+       "buffer": 100
+   };
     var grid = [];
 
     var features = {
         "type": "FeatureCollection",
-        "features": [line]
+        "features": [config.line]
     };
 
 
@@ -169,28 +192,32 @@
             "id": "lines",
             "type": "line",
             "source": "features",
-            "filter": ["==", "$type", "LineString"]
+            "filter": ["==", "$type", "LineString"]§
         });
 
         map.on('mousemove', function (e) {
-            var point = {
-                "type": "Feature",
-                "properties": {},
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [
-                        e.lngLat.lng,
-                        e.lngLat.lat
-                    ]
-                }
-            };
+            // var point = {
+            //     "type": "Feature",
+            //     "properties": {},
+            //     "geometry": {
+            //         "type": "Point",
+            //         "coordinates": [
+            //             e.lngLat.lng,
+            //             e.lngLat.lat
+            //         ]
+            //     }
+            // };
 
-            grid = rectangleBufferedGrid(point, line, 10,15, 100);
-            map.getSource('features').setData({
-                "type": "FeatureCollection",
-                "features": [...grid, line, point]
-            });
+            // grid = bufferedGrid(line, point, 10,15, 100);
+            // map.getSource('features').setData({
+            //     "type": "FeatureCollection",
+            //     "features": [...grid, line, point]
+            // });
         });
+
+        grid = bufferedGrid(config.line, config.point, config.rows, config.cols, config.buffer);
+        console.log(JSON.stringify(grid));
+        map.getSource('features').setData(grid);
 
     });
 
