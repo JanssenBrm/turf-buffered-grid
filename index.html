@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset='utf-8' />
+    <meta charset='utf-8'/>
     <title></title>
-    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no'/>
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.2.0/mapbox-gl.js'></script>
-    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.2.0/mapbox-gl.css' rel='stylesheet' />
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.2.0/mapbox-gl.css' rel='stylesheet'/>
     <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
     <style>
         body {
@@ -77,7 +77,9 @@
         const baseP3 = turf.transformTranslate(baseP2, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
         const baseP4 = turf.transformTranslate(baseP1, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
 
-        const basePolygon = turf.polygon([[baseP1, baseP2, baseP3, baseP4, baseP1].map(point => point.geometry.coordinates)]);
+        const basePolygon = turf.polygon([[baseP1, baseP2, baseP3, baseP4, baseP1].map(point => point.geometry.coordinates)
+    ])
+        ;
 
         let rowPolygon = basePolygon;
         let idxX = 0;
@@ -96,67 +98,48 @@
     }
 
 
-
     mapboxgl.accessToken = 'pk.eyJ1IjoiYnJhbWphbnNzZW4iLCJhIjoiY2o4dnlpdGt5MTZrbTMzcnB2amJxcmRzdyJ9.WQfT2IF5Ij15-jTxbgMWRw';
     var map = new mapboxgl.Map({
-        container: 'map', // container id
-        style: 'mapbox://styles/mapbox/light-v10', // stylesheet location
-        center: [ 5.261077880859375,
-            51.11473061746101], // starting position
-        zoom: 11 // starting zoom
+        container: 'map',
+        style: 'mapbox://styles/mapbox/light-v10',
+        center: [5.261077880859375,
+            51.11473061746101],
+        zoom: 11
     });
 
-    // var line = {
-    //     "type": "Feature",
-    //     "properties": {},
-    //     "geometry": {
-    //         "type": "LineString",
-    //         "coordinates": [
-    //             [
-    //                 5.1470947265625,
-    //                 51.195760497969785
-    //             ],
-    //             [
-    //                 5.365447998046875,
-    //                 51.006272518565515
-    //             ]
-    //         ]
-    //     }
-    // };
-
-   var config = {
-       "line": {
-           "type": "Feature",
-           "properties": {},
-           "geometry": {
-               "type": "LineString",
-               "coordinates": [
-                   [
-                       5.1470947265625,
-                       51.006272518565515
-                   ],
-                   [
-                       5.365447998046875,
-                       51.195760497969785
-                   ]
-               ]
-           }
-       },
-       "point": {
-           "type": "Feature",
-           "properties": {},
-           "geometry": {
-               "type": "Point",
-               "coordinates": [
-                   5.168986916542053,
-                   51.16964680028178
-               ]
-           }
-       },
-       "rows": 10,
-       "cols": 15,
-       "buffer": 100
-   };
+    var config = {
+        "line": {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        5.1470947265625,
+                        51.006272518565515
+                    ],
+                    [
+                        5.365447998046875,
+                        51.195760497969785
+                    ]
+                ]
+            }
+        },
+        "point": {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    5.168986916542053,
+                    51.16964680028178
+                ]
+            }
+        },
+        "rows": 10,
+        "cols": 15,
+        "buffer": 100
+    };
     var grid = [];
 
     var features = {
@@ -165,7 +148,7 @@
     };
 
 
-    map.on('load', function() {
+    map.on('load', function () {
         map.addSource('features', {
             type: 'geojson',
             data: features
@@ -192,37 +175,28 @@
             "id": "lines",
             "type": "line",
             "source": "features",
-            "filter": ["==", "$type", "LineString"]§
-        });
+            "filter": ["==", "$type", "LineString"]
+        })
+        ;
 
         map.on('mousemove', function (e) {
-            // var point = {
-            //     "type": "Feature",
-            //     "properties": {},
-            //     "geometry": {
-            //         "type": "Point",
-            //         "coordinates": [
-            //             e.lngLat.lng,
-            //             e.lngLat.lat
-            //         ]
-            //     }
-            // };
+            var point = {
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            e.lngLat.lng,
+                            e.lngLat.lat
+                        ]
+                    }
+                };
 
-            // grid = bufferedGrid(line, point, 10,15, 100);
-            // map.getSource('features').setData({
-            //     "type": "FeatureCollection",
-            //     "features": [...grid, line, point]
-            // });
+            grid = bufferedGrid(config.line, point, config.rows, config.cols, config.buffer);
+            console.log(JSON.stringify(grid));
+            map.getSource('features').setData({ ...grid, features: [...grid.features, point]});
         });
-
-        grid = bufferedGrid(config.line, config.point, config.rows, config.cols, config.buffer);
-        console.log(JSON.stringify(grid));
-        map.getSource('features').setData(grid);
-
     });
-
-
-
 
 
 </script>
