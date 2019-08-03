@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title></title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.2.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.2.0/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id='map'></div>
+<script>
+
+    /**
+     *
+     * @param point - GeoJSON object representing the point to set the height of the grid
+     * @param line - GeoJSON object representing the base line to start the grid generation
+     * @param rows - Number of rows
+     * @param cols - Number of columns
+     * @param buffer - Buffer between cells in geographical meters
+     * @returns {Array}
+     */
+    function rectangleBufferedGrid(point, line, rows, cols, buffer = 0) {
+        var result = [];
+
+        var startLine = turf.point(line.geometry.coordinates[0]);
+        var endLine = turf.point(line.geometry.coordinates[line.geometry.coordinates.length - 1]);
+
+        // Get the distance between the point and the line to calculate the height of the box
+        var height = turf.pointToLineDistance(point, line, {units: 'degrees'});
+
+        // Calculate line length
+        var length = turf.length(line, {units: 'degrees'});
+
+        // Get the bearings (degrees of the lines) of the line between the start point and point that is used for the heigh
+        var bearingToPoint = turf.bearing(startLine, point);
+
+        // Get the bearings (degrees of the lines) of the starting line
+        var bearingLine = turf.bearing(startLine, endLine);
+
+        // Check the the angle of the point based on the bearing of the line to determine to which direction to draw the grid
+        var angle = Math.abs(bearingToPoint) < bearingLine ? -90 : 90;
+
+        // Calculate the length of each grid cell based on the number of cells required on the base line
+        var diffX = length / rows;
+
+        // Calculate the height of each grid cell based on the number of cells required on the line perpendicular to the base line
+        var diffY = height / cols;
+
+
+        // Translate the start point over the diffs to create a basic polygon
+       turf.transformTranslate(startLine, height, bearingLine + angle, {units: 'degrees'});
+        var translatedEnd = turf.transformTranslate(endLine, height, bearingLine + angle , {units: 'degrees'});
+
+        var bufferDegrees = turf.lengthToDegrees(buffer, 'meters');
+
+        var baseP1 = startLine;
+        var baseP2 = turf.transformTranslate(baseP1, diffY - bufferDegrees, bearingLine + angle, {units: 'degrees'});
+        var baseP3 = turf.transformTranslate(baseP2, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
+        var baseP4 = turf.transformTranslate(baseP1, diffX - bufferDegrees, bearingLine, {units: 'degrees'});
+
+        var basePolygon = turf.polygon(
+            [[baseP1, baseP2, baseP3, baseP4, baseP1].map(point => point.geometry.coordinates)]
+        )
+
+        var rowPolygon = basePolygon;
+        idxX = 0;
+        idxY = 0;
+
+        while(idxX < rows) {
+            idxY = 0;
+            rowPolygon = turf.transformTranslate(basePolygon, idxX * diffX, bearingLine, {units: 'degrees'});
+            while(idxY < cols){
+               result.push( turf.transformTranslate(rowPolygon, idxY * diffY, bearingLine + angle, {units: 'degrees'}))
+                idxY++;
+            }
+            idxX++;
+        }
+        return result;
+    }
+
+
+
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYnJhbWphbnNzZW4iLCJhIjoiY2o4dnlpdGt5MTZrbTMzcnB2amJxcmRzdyJ9.WQfT2IF5Ij15-jTxbgMWRw';
+    var map = new mapboxgl.Map({
+        container: 'map', // container id
+        style: 'mapbox://styles/mapbox/light-v10', // stylesheet location
+        center: [ 5.261077880859375,
+            51.11473061746101], // starting position
+        zoom: 11 // starting zoom
+    });
+
+    var line = {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [
+                [
+                    5.1470947265625,
+                    51.095760497969785
+                ],
+                [
+                    5.365447998046875,
+                    51.086272518565515
+                ]
+            ]
+        }
+    };
+
+    var point = {
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+            "type": "Point",
+            "coordinates": [
+                5.2679443359375,
+                51.144894309328016
+            ]
+        }
+    };
+
+    var grid = [];
+
+    var features = {
+        "type": "FeatureCollection",
+        "features": [line]
+    };
+
+
+    map.on('load', function() {
+        map.addSource('features', {
+            type: 'geojson',
+            data: features
+        });
+
+        map.addLayer({
+            "id": "polygon",
+            "type": "fill",
+            "source": "features",
+            "paint": {
+                "fill-color": "#888888",
+                "fill-opacity": 0.4,
+                "fill-outline-color": "#000000"
+            },
+            "filter": ["==", "$type", "Polygon"]
+        });
+        map.addLayer({
+            "id": "points",
+            "type": "circle",
+            "source": "features",
+            "filter": ["==", "$type", "Point"]
+        });
+        map.addLayer({
+            "id": "lines",
+            "type": "line",
+            "source": "features",
+            "filter": ["==", "$type", "LineString"]
+        });
+
+        map.on('mousemove', function (e) {
+            var point = {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [
+                        e.lngLat.lng,
+                        e.lngLat.lat
+                    ]
+                }
+            };
+
+            grid = rectangleBufferedGrid(point, line, 10,15, 100);
+            map.getSource('features').setData({
+                "type": "FeatureCollection",
+                "features": [...grid, line, point]
+            });
+        });
+
+    });
+
+
+
+
+
+</script>
+</body>
+</html>
